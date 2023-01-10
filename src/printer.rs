@@ -22,7 +22,7 @@ use crate::planner::Query;
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::ObjectList;
-use kube::Resource;
+// use kube::Resource;
 use prettytable::{Cell, Row, Table};
 use std::collections::HashMap;
 
@@ -92,7 +92,7 @@ impl<'a> Printer<'a> {
         let v = objects
             .items
             .into_iter()
-            .map(|x| x.name())
+            .map(|x| x.metadata.name.unwrap())
             .collect::<Vec<String>>();
         self.items.push(PrintItem {
             context: ctx,
@@ -106,7 +106,7 @@ impl<'a> Printer<'a> {
         let v = objects
             .items
             .into_iter()
-            .map(|x| x.name())
+            .map(|x| x.metadata.name.unwrap())
             .collect::<Vec<String>>();
         self.items.push(PrintItem {
             context: ctx,

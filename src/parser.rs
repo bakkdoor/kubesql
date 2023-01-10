@@ -84,14 +84,14 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
         queries: vec![],
     };
 
-    match query.body {
+    match &*query.body {
         SetExpr::Select(s) => {
             if s.projection.is_empty() {
                 panic!("SELECT statement is required to call the given namespace(s)!")
             }
 
             // SELECT ...
-            for p in s.projection {
+            for p in &s.projection {
                 match p {
                     SelectItem::UnnamedExpr(o) => {
                         queries.namespaces.push(o.to_string().replace("_", "-"));
@@ -99,10 +99,10 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                     SelectItem::ExprWithAlias { .. } => {
                         panic!("SELECT statement does not support ExprWithAlias selector!")
                     }
-                    SelectItem::QualifiedWildcard(_) => {
+                    SelectItem::QualifiedWildcard(_, _) => {
                         panic!("SELECT statement does not support QualifiedWildcard selector!")
                     }
-                    SelectItem::Wildcard => {
+                    SelectItem::Wildcard(_) => {
                         panic!("SELECT statement does not support Widcard selector!")
                     }
                 }
@@ -113,11 +113,11 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
             }
 
             // FROM ...
-            for f in s.from {
+            for f in &s.from {
                 if !f.joins.is_empty() {
                     panic!("FROM statement does not support Join!")
                 }
-                match f.relation {
+                match &f.relation {
                     TableFactor::Table {
                         name,
                         alias,
@@ -128,8 +128,11 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                         if alias.is_some() {
                             panic!("FROM statement does not support Table aliases!")
                         }
-                        if !args.is_empty() {
-                            panic!("FROM statement does not support Table ARGS!")
+
+                        if let Some(args) = args {
+                            if !args.is_empty() {
+                                panic!("FROM statement does not support Table ARGS!")
+                            }
                         }
                         if !with_hints.is_empty() {
                             panic!("FROM statement does not support Table HINT!")
@@ -142,15 +145,18 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                     TableFactor::TableFunction { .. } => {
                         panic!("FROM statement does not support TableFunction!")
                     }
-                    TableFactor::NestedJoin(_) => {
+                    TableFactor::NestedJoin { .. } => {
                         panic!("FROM statement does not support NestedJoin!")
+                    }
+                    TableFactor::UNNEST { .. } => {
+                        panic!("FROM statement does not support UNNEST!")
                     }
                 }
             }
 
             // WHERE
-            if let Some(w) = s.selection {
-                let plan = planner::plan_expr(w);
+            if let Some(w) = &s.selection {
+                let plan = planner::plan_expr(w.to_owned());
                 match plan {
                     Object::Queries(q) => queries.queries = q,
                     Object::Query(q) => queries.queries.push(q),
