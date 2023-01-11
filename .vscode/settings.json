@@ -8,6 +8,7 @@
     "prettytable",
     "printstd",
     "sqlparser",
+    "thiserror",
     "UNNEST"
   ]
 }

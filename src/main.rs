@@ -18,6 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 mod api_builder;
+mod eval;
 mod parser;
 mod planner;
 mod printer;

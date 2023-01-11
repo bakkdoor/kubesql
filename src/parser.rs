@@ -159,7 +159,7 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
 
             // WHERE
             if let Some(w) = &s.selection {
-                let plan = planner::plan_expr(w.to_owned());
+                let plan = planner::plan_expr(w.to_owned()).unwrap();
                 match plan {
                     Value::Queries(q) => queries.queries = q,
                     Value::Query(q) => queries.queries.push(q),
