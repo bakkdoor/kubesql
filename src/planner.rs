@@ -43,7 +43,7 @@ pub(crate) fn plan_expr(expr: Expr) -> Object {
         Expr::BinaryOp { left, op, right } => plan_expr_binary_op(*left, op, *right),
         Expr::Value(v) => plan_expr_value(v),
         _ => {
-            panic!("unspport");
+            panic!("plan_expr::unsupported: {:?}", expr);
         }
     }
 }
