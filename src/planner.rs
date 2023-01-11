@@ -17,16 +17,16 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use sqlparser::ast::{BinaryOperator, Expr, Ident, Value as ASTValue};
+use sqlparser::ast;
 
 #[derive(Debug, Clone)]
 pub struct Query {
-    pub key: Option<BinaryOperator>,
+    pub key: Option<ast::BinaryOperator>,
     pub kind: String,
     pub field1: String,
     pub field2: String,
     pub eq: String,
-    pub op: BinaryOperator,
+    pub op: ast::BinaryOperator,
 }
 
 #[derive(Debug)]
@@ -37,22 +37,22 @@ pub enum Value {
     Queries(Vec<Query>),
 }
 
-pub(crate) fn plan_expr(expr: Expr) -> Value {
+pub(crate) fn plan_expr(expr: ast::Expr) -> Value {
     match expr {
-        Expr::CompoundIdentifier(i) => plan_expr_compound_ident(i),
-        Expr::BinaryOp { left, op, right } => plan_expr_binary_op(*left, op, *right),
-        Expr::Value(v) => plan_expr_value(v),
+        ast::Expr::CompoundIdentifier(i) => plan_expr_compound_ident(i),
+        ast::Expr::BinaryOp { left, op, right } => plan_expr_binary_op(*left, op, *right),
+        ast::Expr::Value(v) => plan_expr_value(v),
         _ => {
             panic!("plan_expr::unsupported: {:?}", expr);
         }
     }
 }
 
-fn plan_expr_compound_ident(idents: Vec<Ident>) -> Value {
+fn plan_expr_compound_ident(idents: Vec<ast::Ident>) -> Value {
     Value::Strings(idents.iter().cloned().map(|e| e.value).collect())
 }
 
-fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Value {
+fn plan_expr_binary_op(left: ast::Expr, op: ast::BinaryOperator, right: ast::Expr) -> Value {
     let l = plan_expr(left);
     let r = plan_expr(right);
 
@@ -66,16 +66,16 @@ fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Value {
     }
 }
 
-fn plan_expr_value(value: ASTValue) -> Value {
+fn plan_expr_value(value: ast::Value) -> Value {
     match value {
-        ASTValue::SingleQuotedString(s) | ASTValue::DoubleQuotedString(s) => Value::String(s),
+        ast::Value::SingleQuotedString(s) | ast::Value::DoubleQuotedString(s) => Value::String(s),
         _ => {
             panic!("plan_expr_value::unsupported!")
         }
     }
 }
 
-fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator) -> Value {
+fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: ast::BinaryOperator) -> Value {
     if input.len() != 3 {
         panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
     }
@@ -90,7 +90,7 @@ fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator)
     })
 }
 
-fn plan_expr_binary_op_query_vec(input: Query, mut eq: Query, op: BinaryOperator) -> Value {
+fn plan_expr_binary_op_query_vec(input: Query, mut eq: Query, op: ast::BinaryOperator) -> Value {
     let mut v = vec![input];
     eq.key = Some(op);
     v.push(eq);
@@ -101,7 +101,7 @@ fn plan_expr_binary_op_query_vec(input: Query, mut eq: Query, op: BinaryOperator
 fn plan_expr_binary_op_query_vec_append(
     input: Vec<Query>,
     mut eq: Query,
-    op: BinaryOperator,
+    op: ast::BinaryOperator,
 ) -> Value {
     let mut v = input;
     eq.key = Some(op);
