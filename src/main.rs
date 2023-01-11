@@ -122,6 +122,13 @@ async fn main() -> Result<()> {
                         found = true;
                     }
                 }
+                ResourceType::Service => {
+                    let o = api.get_service().list(&list_params).await?;
+                    if !o.items.is_empty() {
+                        printer.insert_services(api.get_context(), api.get_namespace(), o);
+                        found = true;
+                    }
+                }
             }
 
             // we will decide according to given operator, in case if resource not found or empty

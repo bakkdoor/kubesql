@@ -38,6 +38,7 @@ pub struct ApiQueries {
 pub enum ResourceType {
     Deployment,
     Pod,
+    Service,
 }
 
 impl fmt::Display for ResourceType {
@@ -45,6 +46,7 @@ impl fmt::Display for ResourceType {
         match self {
             ResourceType::Deployment => write!(f, "deployment"),
             ResourceType::Pod => write!(f, "pod"),
+            ResourceType::Service => write!(f, "service"),
         }
     }
 }
@@ -56,6 +58,7 @@ impl FromStr for ResourceType {
         match input {
             "deployment" => Ok(ResourceType::Deployment),
             "pod" => Ok(ResourceType::Pod),
+            "service" => Ok(ResourceType::Service),
             _ => panic!("Unexpected ResourceType for {}", input),
         }
     }

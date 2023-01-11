@@ -20,7 +20,7 @@
 use crate::planner::Query;
 use anyhow::{Context, Result};
 use k8s_openapi::api::apps::v1::Deployment;
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::core::v1::{Pod, Service};
 use kube::Api;
 use std::convert::TryFrom;
 
@@ -40,6 +40,9 @@ pub struct ApiBuilder<'a> {
 
     // Api::Namespaced Pod value
     pod: Option<Api<Pod>>,
+
+    // Api::Namespaced Service value
+    service: Option<Api<Service>>,
 }
 
 impl<'a> Default for ApiBuilder<'a> {
@@ -50,6 +53,7 @@ impl<'a> Default for ApiBuilder<'a> {
             queries: None,
             deployment: None,
             pod: None,
+            service: None,
         }
     }
 }
@@ -98,7 +102,11 @@ impl<'a> ApiBuilder<'a> {
                     c.clone(),
                     self.namespace.clone().unwrap().as_str(),
                 ));
-                self.pod =
+                self.pod = Option::from(Api::namespaced(
+                    c.clone(),
+                    self.namespace.clone().unwrap().as_str(),
+                ));
+                self.service =
                     Option::from(Api::namespaced(c, self.namespace.clone().unwrap().as_str()));
             }
             Err(e) => {
@@ -123,5 +131,9 @@ impl<'a> ApiBuilder<'a> {
 
     pub fn get_pod(&'a self) -> &Api<Pod> {
         self.pod.as_ref().unwrap()
+    }
+
+    pub fn get_service(&'a self) -> &Api<Service> {
+        self.service.as_ref().unwrap()
     }
 }

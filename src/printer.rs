@@ -19,8 +19,8 @@
 
 use crate::parser::ResourceType;
 use crate::planner::Query;
-use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::{apps::v1::Deployment, core::v1::Service};
 use kube::api::ObjectList;
 // use kube::Resource;
 use prettytable::{Cell, Row, Table};
@@ -116,12 +116,27 @@ impl<'a> Printer<'a> {
         });
     }
 
+    pub fn insert_services(&mut self, ctx: &'a str, ns: &'a str, objects: ObjectList<Service>) {
+        let v = objects
+            .items
+            .into_iter()
+            .map(|x| x.metadata.name.unwrap())
+            .collect::<Vec<String>>();
+        self.items.push(PrintItem {
+            context: ctx,
+            namespace: ns,
+            kind: ResourceType::Service,
+            value: v.join("\n"),
+        });
+    }
+
     pub fn print(self) {
         // 1. Creating tables for all given contexts
 
         // Represents 'Context - Table' mapping
         let mut table_context_pods: HashMap<String, Table> = HashMap::new();
         let mut table_context_deployments: HashMap<String, Table> = HashMap::new();
+        let mut table_context_services: HashMap<String, Table> = HashMap::new();
 
         let should_append_pod: bool = self
             .queries
@@ -131,6 +146,10 @@ impl<'a> Printer<'a> {
         let should_append_deployment: bool = self.queries.unwrap().iter().any(|x| {
             x.kind
                 .eq_ignore_ascii_case(&*ResourceType::Deployment.to_string())
+        });
+        let should_append_service: bool = self.queries.unwrap().iter().any(|x| {
+            x.kind
+                .eq_ignore_ascii_case(&*ResourceType::Service.to_string())
         });
 
         // 2. Initialize the all contexts
@@ -146,9 +165,11 @@ impl<'a> Printer<'a> {
 
             let mut table_ctx_pods = table_ctx.clone();
             let mut table_ctx_deployments = table_ctx.clone();
+            let mut table_ctx_services = table_ctx.clone();
 
             let mut cells_pods: Vec<Cell> = Vec::new();
             let mut cells_deployments: Vec<Cell> = Vec::new();
+            let mut cells_services: Vec<Cell> = Vec::new();
 
             for ns in self.namespaces.unwrap() {
                 if should_append_pod {
@@ -186,13 +207,33 @@ impl<'a> Printer<'a> {
                         cells_deployments.push(Cell::new("-"));
                     }
                 }
+
+                if should_append_service {
+                    let services = self
+                        .items
+                        .iter()
+                        .filter(|f| {
+                            f.kind == ResourceType::Service
+                                && *f.context == *context
+                                && *f.namespace == *ns
+                        })
+                        .map(|m| m.value.clone())
+                        .collect::<String>();
+                    if !services.is_empty() {
+                        cells_services.push(Cell::new(&*services));
+                    } else {
+                        cells_services.push(Cell::new("-"));
+                    }
+                }
             }
 
             table_ctx_pods.add_row(Row::new(cells_pods));
             table_ctx_deployments.add_row(Row::new(cells_deployments));
+            table_ctx_services.add_row(Row::new(cells_services));
 
             table_context_pods.insert(context.clone(), table_ctx_pods);
             table_context_deployments.insert(context.clone(), table_ctx_deployments);
+            table_context_services.insert(context.clone(), table_ctx_services);
         }
 
         let mut row: Vec<Row> = vec![];
@@ -222,6 +263,15 @@ impl<'a> Printer<'a> {
                 .collect::<Row>();
             rows_deployment.insert_cell(0, Cell::new("deployment"));
             row.push(rows_deployment);
+        }
+
+        if should_append_service {
+            let mut rows_service: Row = table_context_services
+                .iter()
+                .map(|x| Cell::from(x.1))
+                .collect::<Row>();
+            rows_service.insert_cell(0, Cell::new("service"));
+            row.push(rows_service);
         }
 
         Table::init(row).printstd();
