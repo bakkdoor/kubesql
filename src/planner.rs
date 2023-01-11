@@ -17,7 +17,24 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+use std::fmt::Display;
+
 use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum QueryValue {
+    String(String),
+    Number(String, bool),
+}
+
+impl Display for QueryValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryValue::Number(n, _l) => n.fmt(f),
+            QueryValue::String(s) => s.fmt(f),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Query {
@@ -25,7 +42,7 @@ pub struct Query {
     pub kind: String,
     pub field1: String,
     pub field2: String,
-    pub eq: String,
+    pub eq: QueryValue,
     pub op: BinaryOperator,
 }
 
@@ -33,6 +50,8 @@ pub struct Query {
 pub enum Object {
     Strings(Vec<String>),
     String(String),
+    Number(String, bool),
+    Numbers(Vec<(String, bool)>),
     Query(Query),
     Queries(Vec<Query>),
 }
@@ -57,7 +76,11 @@ fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Object {
     let r = plan_expr(right);
 
     match (l, r) {
-        (Object::Strings(a), Object::String(b)) => plan_expr_binary_op_query(a, b, op),
+        (Object::Strings(a), Object::String(b)) => plan_expr_binary_op_string_query(a, b, op),
+        (Object::Strings(a), Object::Number(n, l)) => {
+            plan_expr_binary_op_number_query(a, (n, l), op)
+        }
+
         (Object::Query(a), Object::Query(b)) => plan_expr_binary_op_query_vec(a, b, op),
         (Object::Queries(a), Object::Query(b)) => plan_expr_binary_op_query_vec_append(a, b, op),
         (x, y) => {
@@ -69,13 +92,15 @@ fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Object {
 fn plan_expr_value(value: Value) -> Object {
     match value {
         Value::SingleQuotedString(s) | Value::DoubleQuotedString(s) => Object::String(s),
+        Value::Number(n, l) => Object::Number(n, l),
         _ => {
-            panic!("plan_expr_value::unspported!")
+            eprintln!("Not supported: {:?}", value);
+            panic!("plan_expr_value::unsupported!")
         }
     }
 }
 
-fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator) -> Object {
+fn plan_expr_binary_op_string_query(input: Vec<String>, eq: String, op: BinaryOperator) -> Object {
     if input.len() != 3 {
         panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
     }
@@ -86,7 +111,28 @@ fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator)
             kind: input.get(0).unwrap().to_string(),
             field1: input.get(1).unwrap().to_string(),
             field2: input.get(2).unwrap().to_string(),
-            eq: eq.replace("_", "-"),
+            eq: QueryValue::String(eq.replace("_", "-")),
+            op,
+        },
+    }
+}
+
+fn plan_expr_binary_op_number_query(
+    input: Vec<String>,
+    eq: (String, bool),
+    op: BinaryOperator,
+) -> Object {
+    if input.len() != 3 {
+        panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
+    }
+
+    Object::Query {
+        0: Query {
+            key: None,
+            kind: input.get(0).unwrap().to_string(),
+            field1: input.get(1).unwrap().to_string(),
+            field2: input.get(2).unwrap().to_string(),
+            eq: QueryValue::Number(eq.0, eq.1),
             op,
         },
     }
