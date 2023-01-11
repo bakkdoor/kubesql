@@ -106,7 +106,7 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                         panic!("SELECT statement does not support QualifiedWildcard selector!")
                     }
                     SelectItem::Wildcard(_) => {
-                        panic!("SELECT statement does not support Widcard selector!")
+                        panic!("SELECT statement does not support Wildcard selector!")
                     }
                 }
             }
