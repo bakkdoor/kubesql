@@ -17,7 +17,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
+use sqlparser::ast::{BinaryOperator, Expr, Ident, Value as ASTValue};
 
 #[derive(Debug, Clone)]
 pub struct Query {
@@ -66,9 +66,9 @@ fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Object {
     }
 }
 
-fn plan_expr_value(value: Value) -> Object {
+fn plan_expr_value(value: ASTValue) -> Object {
     match value {
-        Value::SingleQuotedString(s) | Value::DoubleQuotedString(s) => Object::String(s),
+        ASTValue::SingleQuotedString(s) | ASTValue::DoubleQuotedString(s) => Object::String(s),
         _ => {
             panic!("plan_expr_value::unsupported!")
         }
