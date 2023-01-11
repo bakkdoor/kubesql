@@ -70,7 +70,7 @@ fn plan_expr_value(value: Value) -> Object {
     match value {
         Value::SingleQuotedString(s) | Value::DoubleQuotedString(s) => Object::String(s),
         _ => {
-            panic!("plan_expr_value::unspported!")
+            panic!("plan_expr_value::unsupported!")
         }
     }
 }
@@ -80,16 +80,14 @@ fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator)
         panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
     }
 
-    Object::Query {
-        0: Query {
-            key: None,
-            kind: input.get(0).unwrap().to_string(),
-            field1: input.get(1).unwrap().to_string(),
-            field2: input.get(2).unwrap().to_string(),
-            eq: eq.replace("_", "-"),
-            op,
-        },
-    }
+    Object::Query(Query {
+        key: None,
+        kind: input.get(0).unwrap().to_string(),
+        field1: input.get(1).unwrap().to_string(),
+        field2: input.get(2).unwrap().to_string(),
+        eq: eq.replace('_', "-"),
+        op,
+    })
 }
 
 fn plan_expr_binary_op_query_vec(input: Query, mut eq: Query, op: BinaryOperator) -> Object {

@@ -69,7 +69,7 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
 
     // `-` is an incorrect char for SQL Queries, so we need to replace with another char
     // We will undo this replace during parsing stage
-    let sql_replace = sql.replace("-", "_");
+    let sql_replace = sql.replace('-', "_");
 
     // Parse the given SQL to AST
     let mut ast = Parser::parse_sql(&dialect, &sql_replace).unwrap();
@@ -97,7 +97,7 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
             for p in &s.projection {
                 match p {
                     SelectItem::UnnamedExpr(o) => {
-                        queries.namespaces.push(o.to_string().replace("_", "-"));
+                        queries.namespaces.push(o.to_string().replace('_', "-"));
                     }
                     SelectItem::ExprWithAlias { .. } => {
                         panic!("SELECT statement does not support ExprWithAlias selector!")
@@ -140,7 +140,7 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                         if !with_hints.is_empty() {
                             panic!("FROM statement does not support Table HINT!")
                         }
-                        queries.contexts.push(name.to_string().replace("_", "-"));
+                        queries.contexts.push(name.to_string().replace('_', "-"));
                     }
                     TableFactor::Derived { .. } => {
                         panic!("FROM statement does not support Derived!")

@@ -34,26 +34,13 @@ pub struct PrintItem<'a> {
     pub value: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Printer<'a> {
     //items: Option<&'a Vec<PrintItem>>,
     items: Vec<PrintItem<'a>>,
     contexts: Option<&'a [String]>,
     namespaces: Option<&'a [String]>,
     queries: Option<&'a [Query]>,
-    a: Option<&'a String>,
-}
-
-impl<'a> Default for Printer<'a> {
-    fn default() -> Self {
-        Self {
-            items: vec![],
-            contexts: None,
-            namespaces: None,
-            queries: None,
-            a: None,
-        }
-    }
 }
 
 impl<'a> Printer<'a> {
@@ -142,14 +129,14 @@ impl<'a> Printer<'a> {
             .queries
             .unwrap()
             .iter()
-            .any(|x| x.kind.eq_ignore_ascii_case(&*ResourceType::Pod.to_string()));
+            .any(|x| x.kind.eq_ignore_ascii_case(&ResourceType::Pod.to_string()));
         let should_append_deployment: bool = self.queries.unwrap().iter().any(|x| {
             x.kind
-                .eq_ignore_ascii_case(&*ResourceType::Deployment.to_string())
+                .eq_ignore_ascii_case(&ResourceType::Deployment.to_string())
         });
         let should_append_service: bool = self.queries.unwrap().iter().any(|x| {
             x.kind
-                .eq_ignore_ascii_case(&*ResourceType::Service.to_string())
+                .eq_ignore_ascii_case(&ResourceType::Service.to_string())
         });
 
         // 2. Initialize the all contexts
@@ -184,7 +171,7 @@ impl<'a> Printer<'a> {
                         .map(|m| m.value.clone())
                         .collect::<String>();
                     if !pods.is_empty() {
-                        cells_pods.push(Cell::new(&*pods));
+                        cells_pods.push(Cell::new(&pods));
                     } else {
                         cells_pods.push(Cell::new("-"));
                     }
@@ -202,7 +189,7 @@ impl<'a> Printer<'a> {
                         .map(|m| m.value.clone())
                         .collect::<String>();
                     if !deployments.is_empty() {
-                        cells_deployments.push(Cell::new(&*deployments));
+                        cells_deployments.push(Cell::new(&deployments));
                     } else {
                         cells_deployments.push(Cell::new("-"));
                     }
@@ -220,7 +207,7 @@ impl<'a> Printer<'a> {
                         .map(|m| m.value.clone())
                         .collect::<String>();
                     if !services.is_empty() {
-                        cells_services.push(Cell::new(&*services));
+                        cells_services.push(Cell::new(&services));
                     } else {
                         cells_services.push(Cell::new("-"));
                     }
