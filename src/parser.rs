@@ -18,7 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 use crate::planner;
-use crate::planner::{Object, Query};
+use crate::planner::{Query, Value};
 use kube::config::Kubeconfig;
 use sqlparser::ast::{SelectItem, SetExpr, Statement, TableFactor};
 use sqlparser::dialect::GenericDialect;
@@ -161,8 +161,8 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
             if let Some(w) = &s.selection {
                 let plan = planner::plan_expr(w.to_owned());
                 match plan {
-                    Object::Queries(q) => queries.queries = q,
-                    Object::Query(q) => queries.queries.push(q),
+                    Value::Queries(q) => queries.queries = q,
+                    Value::Query(q) => queries.queries.push(q),
                     _ => {
                         panic!("Unable to handle unsupported query plan: {:?}", plan)
                     }

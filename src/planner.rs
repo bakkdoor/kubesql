@@ -30,14 +30,14 @@ pub struct Query {
 }
 
 #[derive(Debug)]
-pub enum Object {
+pub enum Value {
     Strings(Vec<String>),
     String(String),
     Query(Query),
     Queries(Vec<Query>),
 }
 
-pub(crate) fn plan_expr(expr: Expr) -> Object {
+pub(crate) fn plan_expr(expr: Expr) -> Value {
     match expr {
         Expr::CompoundIdentifier(i) => plan_expr_compound_ident(i),
         Expr::BinaryOp { left, op, right } => plan_expr_binary_op(*left, op, *right),
@@ -48,39 +48,39 @@ pub(crate) fn plan_expr(expr: Expr) -> Object {
     }
 }
 
-fn plan_expr_compound_ident(idents: Vec<Ident>) -> Object {
-    Object::Strings(idents.iter().cloned().map(|e| e.value).collect())
+fn plan_expr_compound_ident(idents: Vec<Ident>) -> Value {
+    Value::Strings(idents.iter().cloned().map(|e| e.value).collect())
 }
 
-fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Object {
+fn plan_expr_binary_op(left: Expr, op: BinaryOperator, right: Expr) -> Value {
     let l = plan_expr(left);
     let r = plan_expr(right);
 
     match (l, r) {
-        (Object::Strings(a), Object::String(b)) => plan_expr_binary_op_query(a, b, op),
-        (Object::Query(a), Object::Query(b)) => plan_expr_binary_op_query_vec(a, b, op),
-        (Object::Queries(a), Object::Query(b)) => plan_expr_binary_op_query_vec_append(a, b, op),
+        (Value::Strings(a), Value::String(b)) => plan_expr_binary_op_query(a, b, op),
+        (Value::Query(a), Value::Query(b)) => plan_expr_binary_op_query_vec(a, b, op),
+        (Value::Queries(a), Value::Query(b)) => plan_expr_binary_op_query_vec_append(a, b, op),
         (x, y) => {
             panic!("Type mismatch L: {:?}, R: {:?}!", x, y)
         }
     }
 }
 
-fn plan_expr_value(value: ASTValue) -> Object {
+fn plan_expr_value(value: ASTValue) -> Value {
     match value {
-        ASTValue::SingleQuotedString(s) | ASTValue::DoubleQuotedString(s) => Object::String(s),
+        ASTValue::SingleQuotedString(s) | ASTValue::DoubleQuotedString(s) => Value::String(s),
         _ => {
             panic!("plan_expr_value::unsupported!")
         }
     }
 }
 
-fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator) -> Object {
+fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator) -> Value {
     if input.len() != 3 {
         panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
     }
 
-    Object::Query(Query {
+    Value::Query(Query {
         key: None,
         kind: input.get(0).unwrap().to_string(),
         field1: input.get(1).unwrap().to_string(),
@@ -90,22 +90,22 @@ fn plan_expr_binary_op_query(input: Vec<String>, eq: String, op: BinaryOperator)
     })
 }
 
-fn plan_expr_binary_op_query_vec(input: Query, mut eq: Query, op: BinaryOperator) -> Object {
+fn plan_expr_binary_op_query_vec(input: Query, mut eq: Query, op: BinaryOperator) -> Value {
     let mut v = vec![input];
     eq.key = Some(op);
     v.push(eq);
 
-    Object::Queries(v)
+    Value::Queries(v)
 }
 
 fn plan_expr_binary_op_query_vec_append(
     input: Vec<Query>,
     mut eq: Query,
     op: BinaryOperator,
-) -> Object {
+) -> Value {
     let mut v = input;
     eq.key = Some(op);
     v.push(eq);
 
-    Object::Queries(v)
+    Value::Queries(v)
 }
