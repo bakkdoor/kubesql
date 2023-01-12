@@ -19,13 +19,25 @@
 
 use crate::planner::{self, PlanQuery};
 use crate::planner::{Query, Value};
-use kube::config::Kubeconfig;
+use kube::config::{Kubeconfig, KubeconfigError};
 use sqlparser::ast::{SelectItem, SetExpr, Statement, TableFactor};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use std::fmt;
 use std::fmt::Formatter;
 use std::str::FromStr;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+#[error("ParserError")]
+pub enum ParserError {
+    #[allow(dead_code)]
+    #[error("ParserError: Unknown: {0}")]
+    Unknown(String),
+
+    #[error("ParserError: KubeConfigError: {0:?}")]
+    KubeConfigError(KubeconfigError),
+}
 
 #[derive(Debug)]
 pub struct ApiQueries {
@@ -180,7 +192,6 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
     queries
 }
 
-pub(crate) fn parse_kubeconfig() -> Kubeconfig {
-    kube::config::Kubeconfig::read()
-        .unwrap_or_else(|err| panic!("Could not read KUBECONFIG: {:?}", err))
+pub(crate) fn parse_kubeconfig() -> Result<Kubeconfig, ParserError> {
+    kube::config::Kubeconfig::read().map_err(ParserError::KubeConfigError)
 }

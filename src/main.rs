@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
 
     let mut apis: Vec<ApiBuilder> = Vec::new();
 
-    let kubeconfig = parser::parse_kubeconfig();
+    let kubeconfig = parser::parse_kubeconfig()?;
 
     validator::validate_contexts(kubeconfig, &api_queries.contexts)?;
 
