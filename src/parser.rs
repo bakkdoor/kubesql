@@ -32,11 +32,20 @@ use thiserror::Error;
 #[error("ParserError")]
 pub enum ParserError {
     #[allow(dead_code)]
-    #[error("ParserError: Unknown: {0}")]
+    #[error("Unknown: {0}")]
     Unknown(String),
 
-    #[error("ParserError: KubeConfigError: {0:?}")]
+    #[error("Unsupported: {0}")]
+    Unsupported(String),
+
+    #[error("KubeConfigError: {0:?}")]
     KubeConfigError(KubeconfigError),
+
+    #[error("SELECT statement is required to call the given namespace(s)!")]
+    SelectProjectionsRequired,
+
+    #[error("FROM statement is required to call the given context(s)!")]
+    SelectFromRequired,
 }
 
 #[derive(Debug)]
@@ -64,19 +73,22 @@ impl fmt::Display for ResourceType {
 }
 
 impl FromStr for ResourceType {
-    type Err = ();
+    type Err = ParserError;
 
     fn from_str(input: &str) -> Result<ResourceType, Self::Err> {
         match input {
             "deployment" => Ok(ResourceType::Deployment),
             "pod" => Ok(ResourceType::Pod),
             "service" => Ok(ResourceType::Service),
-            _ => panic!("Unexpected ResourceType for {}", input),
+            _ => Err(ParserError::Unknown(format!(
+                "Unexpected ResourceType for {}",
+                input
+            ))),
         }
     }
 }
 
-pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
+pub(crate) fn parse_sql(sql: &str) -> Result<ApiQueries, ParserError> {
     let dialect = GenericDialect {};
 
     // `-` is an incorrect char for SQL Queries, so we need to replace with another char
@@ -89,7 +101,9 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
     let query = match ast.pop().unwrap() {
         Statement::Query(query) => query,
         _ => {
-            panic!("Only QUERY statements are supported!");
+            return Err(ParserError::Unsupported(
+                "Only QUERY statements are supported!".to_string(),
+            ));
         }
     };
 
@@ -102,7 +116,7 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
     match &*query.body {
         SetExpr::Select(s) => {
             if s.projection.is_empty() {
-                panic!("SELECT statement is required to call the given namespace(s)!")
+                return Err(ParserError::SelectProjectionsRequired);
             }
 
             // SELECT ...
@@ -112,25 +126,34 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                         queries.namespaces.push(o.to_string().replace('_', "-"));
                     }
                     SelectItem::ExprWithAlias { .. } => {
-                        panic!("SELECT statement does not support ExprWithAlias selector!")
+                        return Err(ParserError::Unsupported(
+                            "SELECT statement does not support ExprWithAlias selector!".to_string(),
+                        ))
                     }
                     SelectItem::QualifiedWildcard(_, _) => {
-                        panic!("SELECT statement does not support QualifiedWildcard selector!")
+                        return Err(ParserError::Unsupported(
+                            "SELECT statement does not support QualifiedWildcard selector!"
+                                .to_string(),
+                        ))
                     }
                     SelectItem::Wildcard(_) => {
-                        panic!("SELECT statement does not support Wildcard selector!")
+                        return Err(ParserError::Unsupported(
+                            "SELECT statement does not support Wildcard selector!".to_string(),
+                        ))
                     }
                 }
             }
 
             if s.from.is_empty() {
-                panic!("FROM statement is required to call the given context(s)!")
+                return Err(ParserError::SelectFromRequired);
             }
 
             // FROM ...
             for f in &s.from {
                 if !f.joins.is_empty() {
-                    panic!("FROM statement does not support Join!")
+                    return Err(ParserError::Unsupported(
+                        "FROM statement does not support Join!".to_string(),
+                    ));
                 }
                 match &f.relation {
                     TableFactor::Table {
@@ -141,30 +164,44 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                         ..
                     } => {
                         if alias.is_some() {
-                            panic!("FROM statement does not support Table aliases!")
+                            return Err(ParserError::Unsupported(
+                                "FROM statement does not support Table aliases!".to_string(),
+                            ));
                         }
 
                         if let Some(args) = args {
                             if !args.is_empty() {
-                                panic!("FROM statement does not support Table ARGS!")
+                                return Err(ParserError::Unsupported(
+                                    "FROM statement does not support Table ARGS!".to_string(),
+                                ));
                             }
                         }
                         if !with_hints.is_empty() {
-                            panic!("FROM statement does not support Table HINT!")
+                            return Err(ParserError::Unsupported(
+                                "FROM statement does not support Table HINT!".to_string(),
+                            ));
                         }
                         queries.contexts.push(name.to_string().replace('_', "-"));
                     }
                     TableFactor::Derived { .. } => {
-                        panic!("FROM statement does not support Derived!")
+                        return Err(ParserError::Unsupported(
+                            "FROM statement does not support Derived!".to_string(),
+                        ))
                     }
                     TableFactor::TableFunction { .. } => {
-                        panic!("FROM statement does not support TableFunction!")
+                        return Err(ParserError::Unsupported(
+                            "FROM statement does not support TableFunction!".to_string(),
+                        ))
                     }
                     TableFactor::NestedJoin { .. } => {
-                        panic!("FROM statement does not support NestedJoin!")
+                        return Err(ParserError::Unsupported(
+                            "FROM statement does not support NestedJoin!".to_string(),
+                        ))
                     }
                     TableFactor::UNNEST { .. } => {
-                        panic!("FROM statement does not support UNNEST!")
+                        return Err(ParserError::Unsupported(
+                            "FROM statement does not support UNNEST!".to_string(),
+                        ))
                     }
                 }
             }
@@ -177,19 +214,27 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
                     Value::Queries(q) => queries.queries = q,
                     Value::Query(q) => queries.queries.push(q),
                     _ => {
-                        panic!("Unable to handle unsupported query plan: {:?}", plan)
+                        return Err(ParserError::Unsupported(format!(
+                            "Unable to handle unsupported query plan: {:?}",
+                            plan
+                        )))
                     }
                 }
             } else {
-                panic!("WHERE statement is required in order to set --field-selector!")
+                return Err(ParserError::Unsupported(
+                    "WHERE statement is required in order to set --field-selector!".to_string(),
+                ));
             }
         }
         _ => {
-            panic!("An unsupported query body given: {:?}", query.body)
+            return Err(ParserError::Unsupported(format!(
+                "An unsupported query body given: {:?}",
+                query.body
+            )))
         }
     }
 
-    queries
+    Ok(queries)
 }
 
 pub(crate) fn parse_kubeconfig() -> Result<Kubeconfig, ParserError> {

@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
         panic!("Either --query or --file required")
     };
 
-    let api_queries = parser::parse_sql(&sql);
+    let api_queries = parser::parse_sql(&sql)?;
 
     let mut apis: Vec<ApiBuilder> = Vec::new();
 
