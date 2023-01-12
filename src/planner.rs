@@ -30,7 +30,7 @@ pub struct Query {
     pub op: ast::BinaryOperator,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Strings(Vec<String>),
     String(String),
@@ -38,11 +38,16 @@ pub enum Value {
     Queries(Vec<Query>),
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum PlanError {
-    #[allow(dead_code)]
     #[error("Unknown PlanError: {0}")]
     Unknown(String),
+
+    #[error("PlanQuery for {0} unsupported: {1}")]
+    Unsupported(String, String),
+
+    #[error("Type mismatch L: {0:?}, R: {1:?}!")]
+    TypeMismatch(Box<Value>, Box<Value>),
 }
 
 type PlanResult = Result<Value, PlanError>;
@@ -64,9 +69,7 @@ impl PlanQuery for ast::Expr {
                 CompoundIdentifier { identifiers }.plan(context)
             }
             ast::Expr::BinaryOp { left, op, right } => BinaryOp { left, op, right }.plan(context),
-            _ => {
-                panic!("PlanQuery for Expr unsupported: {:?}", self);
-            }
+            _ => Err(PlanError::Unsupported("Expr".to_string(), self.to_string())),
         }
     }
 }
@@ -77,9 +80,10 @@ impl PlanQuery for ast::Value {
             ast::Value::SingleQuotedString(s) | ast::Value::DoubleQuotedString(s) => {
                 Ok(Value::String(s.clone()))
             }
-            _ => {
-                panic!("PlanQuery for Value unsupported: {}", self)
-            }
+            _ => Err(PlanError::Unsupported(
+                "Value".to_string(),
+                self.to_string(),
+            )),
         }
     }
 }
@@ -127,9 +131,7 @@ impl<'a> PlanQuery for BinaryOp<'a> {
                 v.push(eq);
                 Ok(Value::Queries(v))
             }
-            (x, y) => {
-                panic!("Type mismatch L: {:?}, R: {:?}!", x, y)
-            }
+            (x, y) => Err(PlanError::TypeMismatch(Box::new(x), Box::new(y))),
         }
     }
 }
@@ -143,7 +145,7 @@ struct BinaryOpQuery<'a> {
 impl<'a> PlanQuery for BinaryOpQuery<'a> {
     fn plan(&self, _context: &mut PlanContext) -> PlanResult {
         if self.input.len() != 3 {
-            panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
+            return Err(PlanError::Unknown("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'".to_string()));
         }
 
         Ok(Value::Query(Query {
