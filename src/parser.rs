@@ -17,7 +17,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use crate::planner;
+use crate::planner::{self, PlanQuery};
 use crate::planner::{Query, Value};
 use kube::config::Kubeconfig;
 use sqlparser::ast::{SelectItem, SetExpr, Statement, TableFactor};
@@ -159,7 +159,8 @@ pub(crate) fn parse_sql(sql: &str) -> ApiQueries {
 
             // WHERE
             if let Some(w) = &s.selection {
-                let plan = planner::plan_expr(w.to_owned()).unwrap();
+                let mut plan_context = planner::PlanContext::default();
+                let plan = w.to_owned().plan(&mut plan_context).unwrap();
                 match plan {
                     Value::Queries(q) => queries.queries = q,
                     Value::Query(q) => queries.queries.push(q),

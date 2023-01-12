@@ -47,87 +47,112 @@ pub enum PlanError {
 
 type PlanResult = Result<Value, PlanError>;
 
-pub(crate) fn plan_expr(expr: ast::Expr) -> PlanResult {
-    match expr {
-        ast::Expr::CompoundIdentifier(i) => plan_expr_compound_ident(&i),
-        ast::Expr::BinaryOp { left, op, right } => plan_expr_binary_op(*left, op, *right),
-        ast::Expr::Value(v) => plan_expr_value(v),
-        _ => {
-            panic!("plan_expr::unsupported: {:?}", expr);
+#[derive(Debug, Clone, Default)]
+pub struct PlanContext {
+    // todo
+}
+
+pub trait PlanQuery {
+    fn plan(&self, context: &mut PlanContext) -> PlanResult;
+}
+
+impl PlanQuery for ast::Expr {
+    fn plan(&self, context: &mut PlanContext) -> PlanResult {
+        match self {
+            ast::Expr::Value(v) => v.plan(context),
+            ast::Expr::CompoundIdentifier(identifiers) => {
+                CompoundIdentifier { identifiers }.plan(context)
+            }
+            ast::Expr::BinaryOp { left, op, right } => BinaryOp { left, op, right }.plan(context),
+            _ => {
+                panic!("PlanQuery for Expr unsupported: {:?}", self);
+            }
         }
     }
 }
 
-fn plan_expr_compound_ident(idents: &[ast::Ident]) -> PlanResult {
-    Ok(Value::Strings(
-        idents.iter().cloned().map(|e| e.value).collect(),
-    ))
-}
-
-fn plan_expr_binary_op(left: ast::Expr, op: ast::BinaryOperator, right: ast::Expr) -> PlanResult {
-    let l = plan_expr(left)?;
-    let r = plan_expr(right)?;
-
-    match (l, r) {
-        (Value::Strings(a), Value::String(b)) => plan_expr_binary_op_query(a, b, op),
-        (Value::Query(a), Value::Query(b)) => plan_expr_binary_op_query_vec(a, b, op),
-        (Value::Queries(a), Value::Query(b)) => plan_expr_binary_op_query_vec_append(a, b, op),
-        (x, y) => {
-            panic!("Type mismatch L: {:?}, R: {:?}!", x, y)
+impl PlanQuery for ast::Value {
+    fn plan(&self, _context: &mut PlanContext) -> PlanResult {
+        match self {
+            ast::Value::SingleQuotedString(s) | ast::Value::DoubleQuotedString(s) => {
+                Ok(Value::String(s.clone()))
+            }
+            _ => {
+                panic!("PlanQuery for Value unsupported: {}", self)
+            }
         }
     }
 }
 
-fn plan_expr_value(value: ast::Value) -> PlanResult {
-    match value {
-        ast::Value::SingleQuotedString(s) | ast::Value::DoubleQuotedString(s) => {
-            Ok(Value::String(s))
-        }
-        _ => {
-            panic!("plan_expr_value::unsupported!")
+struct CompoundIdentifier<'a> {
+    identifiers: &'a [ast::Ident],
+}
+
+impl<'a> PlanQuery for CompoundIdentifier<'a> {
+    fn plan(&self, _context: &mut PlanContext) -> PlanResult {
+        Ok(Value::Strings(
+            self.identifiers.iter().cloned().map(|e| e.value).collect(),
+        ))
+    }
+}
+
+struct BinaryOp<'a> {
+    op: &'a ast::BinaryOperator,
+    left: &'a ast::Expr,
+    right: &'a ast::Expr,
+}
+
+impl<'a> PlanQuery for BinaryOp<'a> {
+    fn plan(&self, context: &mut PlanContext) -> PlanResult {
+        let l = self.left.plan(context)?;
+        let r = self.right.plan(context)?;
+
+        match (l, r) {
+            (Value::Strings(a), Value::String(b)) => BinaryOpQuery {
+                op: self.op,
+                input: &a,
+                eq: &b,
+            }
+            .plan(context),
+            (Value::Query(input), Value::Query(mut eq)) => {
+                let mut v = vec![input];
+                eq.key = Some(self.op.clone());
+                v.push(eq);
+
+                Ok(Value::Queries(v))
+            }
+            (Value::Queries(input), Value::Query(mut eq)) => {
+                let mut v = input;
+                eq.key = Some(self.op.clone());
+                v.push(eq);
+                Ok(Value::Queries(v))
+            }
+            (x, y) => {
+                panic!("Type mismatch L: {:?}, R: {:?}!", x, y)
+            }
         }
     }
 }
 
-fn plan_expr_binary_op_query(
-    input: Vec<String>,
-    eq: String,
-    op: ast::BinaryOperator,
-) -> PlanResult {
-    if input.len() != 3 {
-        panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
+struct BinaryOpQuery<'a> {
+    op: &'a ast::BinaryOperator,
+    input: &'a [String],
+    eq: &'a String,
+}
+
+impl<'a> PlanQuery for BinaryOpQuery<'a> {
+    fn plan(&self, _context: &mut PlanContext) -> PlanResult {
+        if self.input.len() != 3 {
+            panic!("WHERE statement does only support three length CompoundIdentifier: i.e. 'pod.status.phase'")
+        }
+
+        Ok(Value::Query(Query {
+            key: None,
+            kind: self.input.get(0).unwrap().to_string(),
+            field1: self.input.get(1).unwrap().to_string(),
+            field2: self.input.get(2).unwrap().to_string(),
+            eq: self.eq.replace('_', "-"),
+            op: self.op.clone(),
+        }))
     }
-
-    Ok(Value::Query(Query {
-        key: None,
-        kind: input.get(0).unwrap().to_string(),
-        field1: input.get(1).unwrap().to_string(),
-        field2: input.get(2).unwrap().to_string(),
-        eq: eq.replace('_', "-"),
-        op,
-    }))
-}
-
-fn plan_expr_binary_op_query_vec(
-    input: Query,
-    mut eq: Query,
-    op: ast::BinaryOperator,
-) -> PlanResult {
-    let mut v = vec![input];
-    eq.key = Some(op);
-    v.push(eq);
-
-    Ok(Value::Queries(v))
-}
-
-fn plan_expr_binary_op_query_vec_append(
-    input: Vec<Query>,
-    mut eq: Query,
-    op: ast::BinaryOperator,
-) -> PlanResult {
-    let mut v = input;
-    eq.key = Some(op);
-    v.push(eq);
-
-    Ok(Value::Queries(v))
 }
