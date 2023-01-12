@@ -18,17 +18,26 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 use kube::config::Kubeconfig;
+use thiserror::Error;
 
-pub fn validate_contexts(kubeconfig: Kubeconfig, ctxs: &[String]) {
+#[derive(Error, Debug)]
+#[error("ValidationError")]
+pub enum ValidationError {
+    #[error("ValidationError: Context not found in your KUBECONFIG: {0:?}")]
+    ContextNotFound(Vec<String>),
+}
+
+pub fn validate_contexts(kubeconfig: Kubeconfig, ctxs: &[String]) -> Result<(), ValidationError> {
     let not_found = ctxs
         .iter()
         .filter(|item| kubeconfig.contexts.iter().all(|s| &s.name != *item))
         .collect::<Vec<&String>>();
 
     if !not_found.is_empty() {
-        panic!(
-            "Given contexts {:?} not found in your KUBECONFIG!",
-            not_found
-        );
+        return Err(ValidationError::ContextNotFound(
+            not_found.iter().map(|x| (*x).clone()).collect(),
+        ));
     }
+
+    Ok(())
 }

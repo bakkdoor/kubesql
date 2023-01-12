@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
 
     let kubeconfig = parser::parse_kubeconfig();
 
-    validator::validate_contexts(kubeconfig, &api_queries.contexts);
+    validator::validate_contexts(kubeconfig, &api_queries.contexts)?;
 
     for ctx in &api_queries.contexts {
         for ns in &api_queries.namespaces {
