@@ -94,7 +94,7 @@ WHERE pod.status.phase = 'Running' AND deployment.metadata.name = 'my-awesome-de
 ### Supported Operators
 | OPERATOR | WHERE | ACTION                   |
 |----------|-------| ------------------------ |
-| AND      | ✓     | Panic if no result found |
+| AND      | ✓     | Error if no result found |
 | OR       | ✓     | Continue                 |
 
 # Special Thanks

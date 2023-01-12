@@ -18,7 +18,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 use crate::planner::Query;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{Pod, Service};
 use kube::Api;
@@ -86,7 +86,7 @@ impl<'a> ApiBuilder<'a> {
         self
     }
 
-    /// Try build the whole API or throw a panic
+    /// Try build the whole API
     pub(crate) async fn build(mut self) -> Result<ApiBuilder<'a>> {
         let client_config = kube::Config::from_kubeconfig(&kube::config::KubeConfigOptions {
             context: Some(self.context.clone().unwrap()),
@@ -110,7 +110,7 @@ impl<'a> ApiBuilder<'a> {
                     Option::from(Api::namespaced(c, self.namespace.clone().unwrap().as_str()));
             }
             Err(e) => {
-                panic!("an error occurred during creating kube client: {:?}", e)
+                bail!("an error occurred during creating kube client: {:?}", e)
             }
         }
 

@@ -27,7 +27,7 @@ mod validator;
 use crate::api_builder::ApiBuilder;
 use crate::parser::ResourceType;
 use crate::printer::Printer;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{App, Arg};
 use kube::api::ListParams;
 use sqlparser::ast::BinaryOperator;
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
             .expect("Unable to read the query file");
         contents
     } else {
-        panic!("Either --query or --file required")
+        bail!("Either --query or --file required")
     };
 
     let api_queries = parser::parse_sql(&sql)?;
@@ -136,9 +136,12 @@ async fn main() -> Result<()> {
             if !found {
                 if let Some(k) = &q.key {
                     if *k == BinaryOperator::And {
-                        panic!(
+                        bail!(
                             "No resource found: 'kubectl get {} --field-selector={}.{}={}'",
-                            q.kind, q.field1, q.field2, q.eq
+                            q.kind,
+                            q.field1,
+                            q.field2,
+                            q.eq
                         );
                     }
                 }
