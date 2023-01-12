@@ -5,5 +5,5 @@ FROM
   minikube
 WHERE
   pod.status.phase = 'Running'
-  OR deployment.metadata.name = 'hello-minikube'
+  OR deployment.metadata.namespace = 'testing'
   OR service.metadata.name = 'hello-minikube'
